@@ -66,6 +66,7 @@ import bisq.core.dao.state.model.governance.Ballot;
 import bisq.core.dao.state.model.governance.BondedRoleType;
 import bisq.core.dao.state.model.governance.Cycle;
 import bisq.core.dao.state.model.governance.DaoPhase;
+import bisq.core.dao.state.model.governance.EvaluatedProposal;
 import bisq.core.dao.state.model.governance.IssuanceType;
 import bisq.core.dao.state.model.governance.Proposal;
 import bisq.core.dao.state.model.governance.Role;
@@ -102,10 +103,12 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -771,6 +774,81 @@ public class DaoFacade implements DaoSetupService {
         long requiredBondUnit = bondedRoleType.getRequiredBondUnit();
         long baseFactor = daoStateService.getParamValueAsCoin(Param.BONDED_ROLE_FACTOR, height).value;
         return requiredBondUnit * baseFactor;
+    }
+
+    public boolean isLockedUpBondValid(BondedRole bondedRole) {
+        String lockupTxId = bondedRole.getLockupTxId();
+        if (lockupTxId == null) {
+            return false;
+        }
+        Role role = bondedRole.getBondedAsset();
+        long amount = bondedRole.getAmount();
+        return isLockedUpTxValid(bondedRole) && isLockedUpBondValid(role, amount);
+    }
+
+    public boolean isLockedUpTxValid(BondedRole bondedRole) {
+        String lockupTxId = bondedRole.getLockupTxId();
+        if (lockupTxId == null) {
+            return false;
+        }
+        return getTx(lockupTxId).stream()
+                .filter(tx -> tx.getTxType() == TxType.LOCKUP)
+                .filter(tx -> tx.getLockTime() == bondedRole.getBondedAsset().getBondedRoleType().getUnlockTimeInBlocks())
+                .anyMatch(tx -> tx.getLockedAmount() == bondedRole.getAmount());
+    }
+
+    public boolean isLockedUpBondValid(Role role, long lockedUpAmount) {
+        return isUnlockTimeValid(role) && isLockedUpBondAmountValid(role, lockedUpAmount);
+    }
+
+    public boolean isLockedUpBondAmountValid(Role role, long lockedUpAmount) {
+        return isRequiredBondUnitValid(role) &&
+                getRequiredBondAmount(role).orElseThrow() == lockedUpAmount;
+    }
+
+    public Optional<Long> getRequiredBondAmount(Role role) {
+        return getAcceptedProposalForRole(role)
+                .map(roleProposal -> {
+                    Optional<Integer> height = daoStateService.getTx(roleProposal.getTxId())
+                            .map(BaseTx::getBlockHeight);
+                    if (height.isEmpty()) {
+                        return null;
+                    }
+                    long baseFactor = daoStateService.getParamValueAsCoin(Param.BONDED_ROLE_FACTOR, height.get()).value;
+                    return roleProposal.getRequiredBondUnit() * baseFactor;
+                })
+                .filter(Objects::nonNull)
+                .findAny();
+    }
+
+    public boolean isRequiredBondUnitValid(Role role) {
+        return getRequiredBondUnit(role).isPresent() &&
+                getRequiredBondUnit(role).get() == role.getBondedRoleType().getRequiredBondUnit();
+    }
+
+    public Optional<Long> getRequiredBondUnit(Role role) {
+        return getAcceptedProposalForRole(role)
+                .map(RoleProposal::getRequiredBondUnit)
+                .findAny();
+    }
+
+    public boolean isUnlockTimeValid(Role role) {
+        return getUnlockTimeFromRolesProposal(role).isPresent() &&
+                getUnlockTimeFromRolesProposal(role).get() == role.getBondedRoleType().getUnlockTimeInBlocks();
+    }
+
+    public Optional<Integer> getUnlockTimeFromRolesProposal(Role role) {
+        return getAcceptedProposalForRole(role)
+                .map(RoleProposal::getUnlockTime)
+                .findAny();
+    }
+
+    private Stream<RoleProposal> getAcceptedProposalForRole(Role role) {
+        return daoStateService.getEvaluatedProposalList().stream()
+                .filter(EvaluatedProposal::isAccepted)
+                .filter(p -> p.getProposal() instanceof RoleProposal)
+                .map(p -> (RoleProposal) p.getProposal())
+                .filter(p -> p.getRole().getUid().equals(role.getUid()));
     }
 
     public Set<String> getAllPastParamValues(Param param) {

@@ -24,16 +24,20 @@ import bisq.core.dao.state.model.governance.BondedRoleType;
 import bisq.core.dao.state.model.governance.Role;
 import bisq.core.locale.Res;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 class RolesListItem {
     private final DaoFacade daoFacade;
     private final BondedRole bondedRole;
+    @Getter
+    private final boolean isLockedUpBondValid;
 
-    RolesListItem(BondedRole bondedRole, DaoFacade daoFacade) {
+    RolesListItem(DaoFacade daoFacade, BondedRole bondedRole) {
         this.daoFacade = daoFacade;
         this.bondedRole = bondedRole;
+        isLockedUpBondValid = daoFacade.isLockedUpBondValid(bondedRole);
     }
 
     public String getLockupTxId() {
@@ -78,6 +82,10 @@ class RolesListItem {
 
     public boolean isRevokeButtonVisible() {
         return iAmOwner() && (this.bondedRole.getBondState() == BondState.LOCKUP_TX_CONFIRMED);
+    }
+
+    public boolean isLockupTxConfirmed() {
+        return this.bondedRole.getBondState() == BondState.LOCKUP_TX_CONFIRMED;
     }
 
     public boolean isSignButtonVisible() {

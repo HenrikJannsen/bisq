@@ -121,7 +121,7 @@ public class RolesView extends ActivatableView<GridPane, Void> {
 
     private void updateList() {
         observableList.setAll(daoFacade.getAcceptedBondedRoles().stream()
-                .map(bond -> new RolesListItem(bond, daoFacade))
+                .map(bond -> new RolesListItem(daoFacade, bond))
                 .sorted(Comparator.comparing(RolesListItem::getLockupDate).reversed())
                 .collect(Collectors.toList()));
         GUIUtil.setFitToRowsForTableView(tableView, 41, 28, 2, 30);
@@ -302,6 +302,15 @@ public class RolesView extends ActivatableView<GridPane, Void> {
                                 if (item != null && !empty) {
                                     if (hbox == null) {
                                         HBox hbox = new HBox();
+                                        hbox.setMinWidth(hbox.getChildren().size() * 70);
+                                        hbox.setSpacing(10);
+                                        setGraphic(hbox);
+                                        if (item.isLockupTxConfirmed() && !item.isLockedUpBondValid()) {
+                                            Label label = new Label(Res.get("dao.bond.table.lockedUpBondInvalid"));
+                                            label.getStyleClass().add("error-text");
+                                            hbox.getChildren().add(label);
+                                            return;
+                                        }
                                         if (item.isSignButtonVisible()) {
                                             AutoTooltipButton buttonSign = new AutoTooltipButton(Res.get("dao.proofOfBurn.sign"));
                                             buttonSign.setMinWidth(70);
@@ -328,9 +337,6 @@ public class RolesView extends ActivatableView<GridPane, Void> {
                                             }));
                                             hbox.getChildren().add(buttonRevoke);
                                         }
-                                        hbox.setMinWidth(hbox.getChildren().size() * 70);
-                                        hbox.setSpacing(10);
-                                        setGraphic(hbox);
                                     }
                                 } else {
                                     setGraphic(null);

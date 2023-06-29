@@ -258,7 +258,7 @@ public class ProposalService implements HashMapChangedListener, AppendOnlyDataSt
                         }
                         tempProposals.add(proposal);
                     } else {
-                        log.debug("We received an invalid proposal from the P2P network. Proposal={}, blockHeight={}",
+                        log.warn("We received an invalid proposal from the P2P network. Proposal={}, blockHeight={}",
                                 proposal, daoStateService.getChainHeight());
                     }
                 }

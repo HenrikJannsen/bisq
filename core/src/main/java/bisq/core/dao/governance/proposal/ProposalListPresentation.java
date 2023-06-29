@@ -146,7 +146,7 @@ public class ProposalListPresentation implements DaoStateListener, MyProposalLis
         // So we only add proposals if they are unconfirmed and therefore not yet parsed. Once confirmed they have to be
         // found in the daoStateService.
         List<Proposal> myUnconfirmedProposals = myProposalListService.getList().stream()
-                .filter(p -> !daoStateService.getTx(p.getTxId()).isPresent()) // Tx is still not in our bsq blocks
+                .filter(p -> daoStateService.getTx(p.getTxId()).isEmpty()) // Tx is still not in our bsq blocks
                 .filter(p -> {
                     TransactionConfidence confidenceForTxId = bsqWalletService.getConfidenceForTxId(p.getTxId());
                     return confidenceForTxId != null &&

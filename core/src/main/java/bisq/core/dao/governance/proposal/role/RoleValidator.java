@@ -22,13 +22,16 @@ import bisq.core.dao.governance.period.PeriodService;
 import bisq.core.dao.governance.proposal.ProposalValidationException;
 import bisq.core.dao.governance.proposal.ProposalValidator;
 import bisq.core.dao.state.DaoStateService;
+import bisq.core.dao.state.model.governance.BondedRoleType;
 import bisq.core.dao.state.model.governance.Proposal;
+import bisq.core.dao.state.model.governance.Role;
 import bisq.core.dao.state.model.governance.RoleProposal;
 
 import javax.inject.Inject;
 
 import lombok.extern.slf4j.Slf4j;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static org.apache.commons.lang3.Validate.notNull;
 
 /**
@@ -48,7 +51,13 @@ public class RoleValidator extends ProposalValidator implements ConsensusCritica
             super.validateDataFields(proposal);
 
             RoleProposal roleProposal = (RoleProposal) proposal;
-            notNull(roleProposal.getRole(), "Bonded role must not be null");
+            Role role = roleProposal.getRole();
+            notNull(role, "Bonded role must not be null");
+            BondedRoleType bondedRoleType = role.getBondedRoleType();
+            checkArgument(roleProposal.getUnlockTime() == bondedRoleType.getUnlockTimeInBlocks(),
+                    "Invalid unlocktime");
+            checkArgument(roleProposal.getRequiredBondUnit() == bondedRoleType.getRequiredBondUnit(),
+                    "Invalid requiredBondUnit");
         } catch (Throwable throwable) {
             throw new ProposalValidationException(throwable);
         }

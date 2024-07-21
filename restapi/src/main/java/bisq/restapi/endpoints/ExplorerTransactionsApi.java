@@ -22,12 +22,11 @@ import bisq.core.dao.state.model.blockchain.BaseTx;
 import bisq.core.dao.state.model.blockchain.Tx;
 import bisq.core.dao.state.model.blockchain.TxType;
 
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
@@ -54,9 +53,10 @@ import jakarta.ws.rs.core.MediaType;
 @Tag(name = "TRANSACTIONS API")
 public class ExplorerTransactionsApi {
     private final DaoStateService daoStateService;
+    private final RestApi restApi;
 
     public ExplorerTransactionsApi(@Context Application application) {
-        RestApi restApi = ((RestApiMain) application).getRestApi();
+        restApi = ((RestApiMain) application).getRestApi();
         daoStateService = restApi.getDaoStateService();
     }
 
@@ -79,14 +79,19 @@ public class ExplorerTransactionsApi {
     @GET
     @Path("get-bsq-tx-for-addr/{addr}")
     public List<JsonTx> getBisqTxForAddr(@PathParam("addr") String address) {
-        Map<String, Set<String>> addressToTxIds = daoStateService.getTxIdSetByAddress();
-        List<JsonTx> result = new ArrayList<>();
-        Set<String> strings = addressToTxIds.get(address);
-        strings.forEach(txId -> {
-            daoStateService.getTx(txId).stream()
-                    .map(tx -> BlockDataToJsonConverter.getJsonTx(daoStateService, tx))
-                    .forEach(result::add);
-        });
+        restApi.checkDaoReady();
+        // In case we get a prefixed address marking BSQ addresses we remove the prefix
+        if (address.startsWith("B")) {
+            address = address.substring(1, address.length());
+        }
+        String finalAddress = address;
+        List<JsonTx> result = daoStateService.getTxIdSetByAddress().entrySet().stream()
+                .filter(e -> e.getKey().equals(finalAddress))
+                .map(Map.Entry::getValue)
+                .flatMap(Collection::stream)
+                .flatMap(txId -> daoStateService.getTx(txId).stream())
+                .map(tx -> BlockDataToJsonConverter.getJsonTx(daoStateService, tx))
+                .collect(Collectors.toList());
         log.info("getBisqTxForAddr: returning {} items.", result.size());
         return result;
     }

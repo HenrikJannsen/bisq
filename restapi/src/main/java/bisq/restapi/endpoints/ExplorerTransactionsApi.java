@@ -64,6 +64,7 @@ public class ExplorerTransactionsApi {
     @Path("get-bsq-tx/{txid}")
     public JsonTx getTx(@Parameter(description = "TxId")
                         @PathParam("txid") String txId) {
+        restApi.checkDaoReady();
         Optional<JsonTx> jsonTx = daoStateService.getUnorderedTxStream()
                 .filter(t -> t.getId().equals(txId))
                 .map(tx -> BlockDataToJsonConverter.getJsonTx(daoStateService, tx))
@@ -101,6 +102,7 @@ public class ExplorerTransactionsApi {
     public List<JsonTx> queryTxsPaginated(@PathParam("start") int start,
                                           @PathParam("count") int count,
                                           @PathParam("filters") String filters) {
+        restApi.checkDaoReady();
         log.info("filters: {}", filters);
         List<JsonTx> jsonTxs = daoStateService.getUnorderedTxStream()
                 .sorted(Comparator.comparing(BaseTx::getTime).reversed())

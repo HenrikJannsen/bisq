@@ -1,8 +1,4 @@
 # Expected format: nodeaddress.onion:port (@owner)
-# removed in 1.9.16
-sn4o3kdfxz6pidvafxv5i5dv3jrk6twtptm7s7wchwwwb5xy37y4x5id.onion:8000 (@403State)
-sn4o3s5peekvk333vkrguw3gmd6mfy6bawynejslcnva2ibdbdrxakyd.onion:8000 (@403State)
-sn4o3zbnlnivbolvsgzapzmfzh6q27z5owrhqbxjlhmcsfrvbo2rd2ad.onion:8000 (@403State)
 # from 1.9.15, to be removed in 1.9.18
 devinv3rhon24gqf5v6ondoqgyrbzyqihzyouzv7ptltsewhfmox2zqd.onion:8000 (@devinbileck)
 devinsn2teu33efff62bnvwbxmfgbfjlgqsu3ad4b4fudx3a725eqnyd.onion:8000 (@devinbileck)

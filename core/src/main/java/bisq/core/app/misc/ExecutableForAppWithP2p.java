@@ -203,23 +203,30 @@ public abstract class ExecutableForAppWithP2p extends BisqExecutable {
                 injector.getInstance(RpcService.class).shutDown();
                 injector.getInstance(DaoSetup.class).shutDown();
                 injector.getInstance(ArbitratorManager.class).shutDown();
-                injector.getInstance(OpenOfferManager.class).shutDown(() -> injector.getInstance(P2PService.class).shutDown(() -> {
-                    injector.getInstance(WalletsSetup.class).shutDownComplete.addListener((ov, o, n) -> {
-                        module.close(injector);
-
-                        PersistenceManager.flushAllDataToDiskAtShutdown(() -> {
-                            resultHandler.handleResult();
-                            log.info("Graceful shutdown completed. Exiting now.");
-                            UserThread.runAfter(() -> System.exit(BisqExecutable.EXIT_SUCCESS), 1);
+                injector.getInstance(OpenOfferManager.class).shutDown(() -> {
+                    log.info("OpenOfferManager shutdown done");
+                    injector.getInstance(P2PService.class).shutDown(() -> {
+                        log.info("P2PService shutdown done");
+                        injector.getInstance(WalletsSetup.class).shutDownComplete.addListener((ov, o, n) -> {
+                            log.info("WalletsSetup shutdown done");
+                            module.close(injector);
+                            PersistenceManager.flushAllDataToDiskAtShutdown(() -> {
+                                log.info("flushAllDataToDiskAtShutdown done");
+                                resultHandler.handleResult();
+                                log.info("Graceful shutdown completed. Exiting now.");
+                                UserThread.runAfter(() -> System.exit(BisqExecutable.EXIT_SUCCESS), 1);
+                            });
                         });
+
+                        injector.getInstance(WalletsSetup.class).shutDown();
+                        injector.getInstance(BtcWalletService.class).shutDown();
+                        injector.getInstance(BsqWalletService.class).shutDown();
                     });
-                    injector.getInstance(WalletsSetup.class).shutDown();
-                    injector.getInstance(BtcWalletService.class).shutDown();
-                    injector.getInstance(BsqWalletService.class).shutDown();
-                }));
+                });
                 // we wait max 5 sec.
                 UserThread.runAfter(() -> {
                     PersistenceManager.flushAllDataToDiskAtShutdown(() -> {
+                        log.info("flushAllDataToDiskAtShutdown done from timeout");
                         resultHandler.handleResult();
                         log.info("Graceful shutdown caused a timeout. Exiting now.");
                         UserThread.runAfter(() -> System.exit(BisqExecutable.EXIT_SUCCESS), 1);
@@ -232,11 +239,10 @@ public abstract class ExecutableForAppWithP2p extends BisqExecutable {
                 }, 1);
             }
         } catch (Throwable t) {
-            log.debug("App shutdown failed with exception");
-            t.printStackTrace();
+            log.warn("App shutdown failed with exception", t);
             PersistenceManager.flushAllDataToDiskAtShutdown(() -> {
                 resultHandler.handleResult();
-                log.info("Graceful shutdown resulted in an error. Exiting now.");
+                log.warn("Graceful shutdown resulted in an error. Exiting now.");
                 UserThread.runAfter(() -> System.exit(BisqExecutable.EXIT_FAILURE), 1);
             });
 

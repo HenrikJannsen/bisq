@@ -506,7 +506,8 @@ public class Connection implements HasCapabilities, Runnable, MessageListener {
                         stopped = true;
                         UserThread.execute(() -> doShutDown(closeConnectionReason, shutDownCompleteHandler));
                     }
-                }, "Connection:SendCloseConnectionMessage-" + this.uid).start();
+                }, "Connection:SendCloseConnectionMessage-" + this.uid)
+                        .start();
             } else {
                 stopped = true;
                 doShutDown(closeConnectionReason, shutDownCompleteHandler);
@@ -521,22 +522,20 @@ public class Connection implements HasCapabilities, Runnable, MessageListener {
     private void doShutDown(CloseConnectionReason closeConnectionReason, @Nullable Runnable shutDownCompleteHandler) {
         // Use UserThread.execute as it's not clear if that is called from a non-UserThread
         UserThread.execute(() -> connectionListener.onDisconnect(closeConnectionReason, this));
+
         try {
             protoOutputStream.onConnectionShutdown();
             socket.close();
         } catch (SocketException e) {
             log.trace("SocketException at shutdown might be expected {}", e.getMessage());
         } catch (IOException e) {
-            log.error("Exception at shutdown. " + e.getMessage());
-            e.printStackTrace();
+            log.error("Exception at shutdown. ", e);
         } finally {
             capabilitiesListeners.clear();
 
             try {
                 protoInputStream.close();
-            } catch (IOException e) {
-                log.error(e.getMessage());
-                e.printStackTrace();
+            } catch (IOException ignore) {
             }
 
             Utilities.shutdownAndAwaitTermination(executorService, SHUTDOWN_TIMEOUT, TimeUnit.MILLISECONDS);

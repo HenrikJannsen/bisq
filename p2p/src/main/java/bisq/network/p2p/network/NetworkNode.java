@@ -363,6 +363,7 @@ public abstract class NetworkNode implements MessageListener, Socks5ProxyInterna
                 server.shutDown();
                 server = null;
             }
+            log.info("server shutdown completed");
 
             Set<Connection> allConnections = getAllConnections();
             int numConnections = allConnections.size();

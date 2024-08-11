@@ -18,6 +18,7 @@
 package bisq.network.p2p.network;
 
 import bisq.common.proto.network.NetworkProtoResolver;
+import bisq.common.util.SingleThreadExecutorUtils;
 
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -26,7 +27,9 @@ import java.net.SocketException;
 import java.io.IOException;
 
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +49,7 @@ class Server implements Runnable {
     private final Set<Connection> connections = new CopyOnWriteArraySet<>();
     private final NetworkProtoResolver networkProtoResolver;
     private final Thread serverThread = new Thread(this);
-
+    private volatile boolean isStopped;
 
     public Server(ServerSocket serverSocket,
                   MessageListener messageListener,
@@ -70,11 +73,11 @@ class Server implements Runnable {
     public void run() {
         try {
             try {
-                while (isServerActive()) {
+                while (!isStopped) {
                     log.debug("Ready to accept new clients on port " + localPort);
                     final Socket socket = serverSocket.accept();
 
-                    if (isServerActive()) {
+                    if (!isStopped) {
                         log.debug("Accepted new client on localPort/port " + socket.getLocalPort() + "/" + socket.getPort());
                         InboundConnection connection = new InboundConnection(socket,
                                 messageListener,
@@ -88,14 +91,14 @@ class Server implements Runnable {
                                 + "\nconnection.uid={}", serverSocket.getLocalPort(), socket.getPort(), connection.getUid()
                                 + "\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n");
 
-                        if (isServerActive())
+                        if (!isStopped)
                             connections.add(connection);
                         else
                             connection.shutDown(CloseConnectionReason.APP_SHUT_DOWN);
                     }
                 }
             } catch (IOException e) {
-                if (isServerActive())
+                if (!isStopped)
                     e.printStackTrace();
             }
         } catch (Throwable t) {
@@ -106,27 +109,38 @@ class Server implements Runnable {
 
     public void shutDown() {
         log.info("Server shutdown started");
-        if (isServerActive()) {
-            serverThread.interrupt();
-            connections.forEach(connection -> connection.shutDown(CloseConnectionReason.APP_SHUT_DOWN));
-
-            try {
-                if (!serverSocket.isClosed()) {
-                    serverSocket.close();
-                }
-            } catch (SocketException e) {
-                log.debug("SocketException at shutdown might be expected " + e.getMessage());
-            } catch (IOException e) {
-                log.debug("Exception at shutdown. " + e.getMessage());
-            } finally {
-                log.debug("Server shutdown complete");
-            }
-        } else {
-            log.warn("stopped already called ast shutdown");
+        if (isStopped) {
+            return;
         }
-    }
-
-    private boolean isServerActive() {
-        return !serverThread.isInterrupted();
+        isStopped = true;
+        connections.forEach(connection -> connection.shutDown(CloseConnectionReason.APP_SHUT_DOWN));
+        if (serverSocket.isClosed()) {
+            return;
+        }
+        try {
+            CompletableFuture.runAsync(() -> {
+                        try {
+                            // Seems it blocks for 1 minute
+                            log.info("Call serverSocket.close");
+                            serverSocket.close();
+                            log.info("serverSocket.close completed");
+                        } catch (SocketException e) {
+                            log.warn("SocketException at shutdown might be expected " + e.getMessage());
+                        } catch (IOException e) {
+                            log.warn("Exception at shutdown. " + e.getMessage());
+                        } finally {
+                            log.info("Server shutdown complete");
+                        }
+                    }, SingleThreadExecutorUtils.getSingleThreadExecutor("Close serverSocket"))
+                    .orTimeout(2, TimeUnit.SECONDS)
+                    .whenComplete((r, t) -> {
+                        if (t != null) {
+                            log.error("serverSocket.close failed. ", t);
+                        }
+                    })
+                    .join();
+        } catch (Exception e) {
+            log.warn("Exception at shutdown. " + e.getMessage());
+        }
     }
 }

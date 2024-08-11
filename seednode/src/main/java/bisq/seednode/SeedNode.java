@@ -50,6 +50,7 @@ public class SeedNode {
     }
 
     public void shutDown() {
+        log.info("shutDown");
         if (getInventoryRequestHandler != null) {
             getInventoryRequestHandler.shutDown();
         }

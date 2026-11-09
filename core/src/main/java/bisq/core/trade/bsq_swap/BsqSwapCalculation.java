@@ -252,12 +252,12 @@ public class BsqSwapCalculation {
 
     // See https://bitcoin.stackexchange.com/questions/87275/how-to-calculate-segwit-transaction-fee-in-bytes
     public static int getVBytesSize(List<RawTransactionInput> inputs, long change) {
-        int size = 5; // Half of base tx size (10)
+        long size = 5; // Half of base tx size (10)
         size += inputs.stream()
                 .mapToLong(input -> input.isSegwit() ? 68 : 149)
                 .sum();
         size += change > 0 ? 62 : 31;
-        return size;
+        return Math.toIntExact(size);
     }
 
     // We use the burned BSQ trade fee for funding the miner fee.
